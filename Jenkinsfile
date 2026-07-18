@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent any // Keep it running on the host agent
 
     environment {
         IMAGE_NAME = "local-adonis-app"
@@ -9,14 +9,17 @@ pipeline {
 
     stages {
         stage('Install & Test Code') {
-            // Tell Jenkins to spin up a Node container specifically for this stage
-            agent { 
-                docker { image 'node:22-alpine' } 
-            }
             steps {
                 echo "Validating code updates on branch: ${env.BRANCH_NAME}"
-                sh 'npm ci'
-                sh 'node ace test || echo "No tests configured yet, skipping safely..."'
+                
+                // Instead of agent { docker }, we call docker run manually on the host shell!
+                // This bypasses Jenkins needing the built-in Docker pipeline plugin tools.
+                sh '''
+                    docker run --rm -v $(pwd):/app -w /app node:22-alpine sh -c "
+                        npm ci && 
+                        node ace test || echo 'No tests configured yet, skipping safely...'
+                    "
+                '''
             }
         }
 
