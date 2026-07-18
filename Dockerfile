@@ -1,34 +1,33 @@
-# Stage 1: Base Environment
-FROM node:24-alpine AS base
-WORKDIR /app
+FROM node:lts-bookworm-slim AS base
 
-# Stage 2: Install All Dependencies (For Building)
+# ----------------------------
+# Stage 1: Install all dependencies
+# ----------------------------
 FROM base AS deps
+WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Stage 3: Create Standalone Build
-FROM base AS build
-COPY --from=deps /app/node_modules /app/node_modules
+# ----------------------------
+# Stage 2: Build the application
+# ----------------------------
+FROM deps AS build
+WORKDIR /app
 COPY . .
 RUN node ace build
 
-# Stage 4: Gather Production-Only Dependencies
-FROM base AS production-deps
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Stage 5: Final Production Runtime Image
-FROM base
-ENV NODE_ENV=production
+# ----------------------------
+# Stage 3: Production runtime
+# ----------------------------
+FROM base AS production
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy built code and dependencies over
-COPY --from=production-deps /app/node_modules ./node_modules
-COPY --from=build /app/build ./build
-COPY package.json ./
+# Copy the compiled JS output from the build folder into /app root
+COPY --from=build /app/build ./
+RUN npm ci --omit=dev
 
 EXPOSE 3333
 
-# 🚀 THE FIX: Print the runtime environment variables into the build folder right before launching
-CMD sh -c "env > build/.env && node build/bin/server.js"
+# 🚀 THE FIXED COMMAND: Put .env in the root (./.env) instead of build/.env
+CMD sh -c "env > .env && node bin/server.js"
