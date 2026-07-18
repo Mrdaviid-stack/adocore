@@ -12,7 +12,7 @@ pipeline {
             steps {
                 echo "Validating code updates on branch: ${env.BRANCH_NAME}"
                 sh '''
-                    docker run --rm -v $(pwd):/app -w /app node:24-alpine sh -c "
+                    docker run --rm -v $(WORKSPACE):/app -w /app node:24-alpine sh -c "
                         npm ci && 
                         npm test || echo 'No tests configured yet, skipping safely...'
                     "
