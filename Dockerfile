@@ -23,9 +23,12 @@ FROM base
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Copy production modules and the standalone compiled JS build
-COPY --from=production-deps /app/node_modules /app/node_modules
+# Copy built code and dependencies over
+COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
+COPY package.json ./
 
 EXPOSE 3333
-CMD ["node", "build/bin/server.js"]
+
+# 🚀 THE FIX: Print the runtime environment variables into the build folder right before launching
+CMD sh -c "env > build/.env && node build/bin/server.js"
