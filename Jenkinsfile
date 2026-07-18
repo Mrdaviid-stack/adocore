@@ -34,17 +34,16 @@ pipeline {
         stage('Deploy to Staging Server') {
             when { branch 'test' }
             steps {
-                // This block automatically fetches the variable stack from Jenkins securely
                 withCredentials([string(credentialsId: 'adocore-env', variable: 'ENV_RAW_DATA')]) {
                     echo '🧪 Deploying automatically to STAGING / TEST environment...'
+                    
+                    // Securely creates the temporary env file in the workspace
+                    writeFile file: 'run.env', text: env.ENV_RAW_DATA
+                    
                     sh """
                         docker stop ${TEST_CONTAINER_NAME} || true
-                        docker rm ${TEST_CONTAINER_NAME} || true
+                        docker rm -f ${TEST_CONTAINER_NAME} || true
                         
-                        # 1. Automatically write your configuration variables to a temporary runtime file
-                        echo "${ENV_RAW_DATA}" > run.env
-                        
-                        # 2. Inject the configuration file automatically via the --env-file flag
                         docker run -d \
                           --name ${TEST_CONTAINER_NAME} \
                           -p 7000:3333 \
@@ -53,7 +52,6 @@ pipeline {
                           --restart unless-stopped \
                           ${IMAGE_NAME}:latest
                           
-                        # 3. Automatically wipe the file clean for security
                         rm -f run.env
                     """
                     echo "Testing site is up automatically at http://localhost:7000"
