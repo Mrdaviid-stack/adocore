@@ -11,12 +11,15 @@ pipeline {
         stage('Install & Test Code') {
             steps {
                 echo "Validating code updates on branch: ${env.BRANCH_NAME}"
-                sh '''
-                    docker run --rm -v $(env.WORKSPACE):/app -w /app node:24-alpine sh -c "
-                        npm ci && 
-                        npm test || echo 'No tests configured yet, skipping safely...'
-                    "
-                '''
+                
+                // Using double quotes and env.WORKSPACE guarantees Jenkins expands the path correctly
+                sh """
+                    docker run --rm \
+                      -v "${env.WORKSPACE}":/app \
+                      -w /app \
+                      node:24-alpine \
+                      sh -c "npm ci && npm test || echo 'No tests configured yet, skipping safely...'"
+                """
             }
         }
 
