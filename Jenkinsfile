@@ -9,6 +9,10 @@ pipeline {
 
     stages {
         stage('Install & Test Code') {
+            // Tell Jenkins to spin up a Node container specifically for this stage
+            agent { 
+                docker { image 'node:22-alpine' } 
+            }
             steps {
                 echo "Validating code updates on branch: ${env.BRANCH_NAME}"
                 sh 'npm ci'
