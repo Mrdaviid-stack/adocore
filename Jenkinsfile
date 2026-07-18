@@ -1,34 +1,29 @@
 pipeline {
-    agent any // Keep it running on the host agent
+    agent any
 
     environment {
-        IMAGE_NAME = "local-adonis-app"
-        TEST_CONTAINER_NAME = "staging-test-adonis"
-        PROD_CONTAINER_NAME = "live-production-adonis"
+        IMAGE_NAME = "local-express-app"
+        TEST_CONTAINER_NAME = "staging-test-express"
+        PROD_CONTAINER_NAME = "live-production-express"
     }
 
     stages {
         stage('Install & Test Code') {
             steps {
                 echo "Validating code updates on branch: ${env.BRANCH_NAME}"
-                
-                // Instead of agent { docker }, we call docker run manually on the host shell!
-                // This bypasses Jenkins needing the built-in Docker pipeline plugin tools.
                 sh '''
-                    docker run --rm -v $(pwd):/app -w /app node:22-alpine sh -c "
+                    docker run --rm -v $(pwd):/app -w /app node:24-alpine sh -c "
                         npm ci && 
-                        node ace test || echo 'No tests configured yet, skipping safely...'
+                        npm test || echo 'No tests configured yet, skipping safely...'
                     "
                 '''
             }
         }
 
         stage('Build Production Docker Image') {
-            when {
-                anyOf { branch 'test'; branch 'main' }
-            }
+            when { anyOf { branch 'test'; branch 'main' } }
             steps {
-                echo 'Building highly optimized standalone AdonisJS production image...'
+                echo 'Building highly optimized standalone production Docker image...'
                 sh "docker build -t ${IMAGE_NAME}:latest ."
             }
         }
@@ -36,42 +31,59 @@ pipeline {
         stage('Deploy to Staging Server') {
             when { branch 'test' }
             steps {
-                echo '🧪 Deploying to STAGING / TEST environment container...'
-                sh """
-                    docker stop ${TEST_CONTAINER_NAME} || true
-                    docker rm ${TEST_CONTAINER_NAME} || true
-                    docker run -d \
-                      --name ${TEST_CONTAINER_NAME} \
-                      -p 7000:3333 \
-                      -e NODE_ENV=production \
-                      -e HOST=0.0.0.0 \
-                      -e PORT=3333 \
-                      -e APP_KEY=\$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))") \
-                      --restart unless-stopped \
-                      ${IMAGE_NAME}:latest
-                """
-                echo "Testing site is up at http://localhost:7000"
+                // This block automatically fetches the variable stack from Jenkins securely
+                withCredentials([string(credentialsId: 'adocore-env', variable: 'ENV_RAW_DATA')]) {
+                    echo '🧪 Deploying automatically to STAGING / TEST environment...'
+                    sh """
+                        docker stop ${TEST_CONTAINER_NAME} || true
+                        docker rm ${TEST_CONTAINER_NAME} || true
+                        
+                        # 1. Automatically write your configuration variables to a temporary runtime file
+                        echo "${ENV_RAW_DATA}" > run.env
+                        
+                        # 2. Inject the configuration file automatically via the --env-file flag
+                        docker run -d \
+                          --name ${TEST_CONTAINER_NAME} \
+                          -p 7000:3333 \
+                          --env-file run.env \
+                          -e APP_KEY=\$(openssl rand -hex 16 2>/dev/null || date +%s | md5sum | head -c 32) \
+                          --restart unless-stopped \
+                          ${IMAGE_NAME}:latest
+                          
+                        # 3. Automatically wipe the file clean for security
+                        rm -f run.env
+                    """
+                    echo "Testing site is up automatically at http://localhost:7000"
+                }
             }
         }
 
         stage('Deploy to Live Production') {
             when { branch 'main' }
             steps {
-                echo '🚀 Deploying to LIVE PRODUCTION server container...'
-                sh """
-                    docker stop ${PROD_CONTAINER_NAME} || true
-                    docker rm ${PROD_CONTAINER_NAME} || true
-                    docker run -d \
-                      --name ${PROD_CONTAINER_NAME} \
-                      -p 8000:3333 \
-                      -e NODE_ENV=production \
-                      -e HOST=0.0.0.0 \
-                      -e PORT=3333 \
-                      -e APP_KEY=\$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))") \
-                      --restart unless-stopped \
-                      ${IMAGE_NAME}:latest
-                """
-                echo "Production application is live at http://localhost:8000"
+                withCredentials([string(credentialsId: 'adocore-env', variable: 'ENV_RAW_DATA')]) {
+                    echo '🚀 Deploying automatically to LIVE PRODUCTION...'
+                    sh """
+                        docker stop ${PROD_CONTAINER_NAME} || true
+                        docker rm ${PROD_CONTAINER_NAME} || true
+                        
+                        # 1. Automatically write your configuration variables to a temporary runtime file
+                        echo "${ENV_RAW_DATA}" > run.env
+                        
+                        # 2. Inject the configuration file automatically via the --env-file flag
+                        docker run -d \
+                          --name ${PROD_CONTAINER_NAME} \
+                          -p 8000:3333 \
+                          --env-file run.env \
+                          -e APP_KEY=\$(openssl rand -hex 16 2>/dev/null || date +%s | md5sum | head -c 32) \
+                          --restart unless-stopped \
+                          ${IMAGE_NAME}:latest
+                          
+                        # 3. Automatically wipe the file clean for security
+                        rm -f run.env
+                    """
+                    echo "Production application is live automatically at http://localhost:8000"
+                }
             }
         }
     }
