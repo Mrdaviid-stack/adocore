@@ -24,7 +24,7 @@ pipeline {
             when { anyOf { branch 'test'; branch 'main' } }
             steps {
                 echo 'Building highly optimized standalone production Docker image...'
-                sh "docker build -t ${IMAGE_NAME}:latest ."
+                sh "docker build --no-cache -t ${IMAGE_NAME}:latest ."
             }
         }
 
