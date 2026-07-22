@@ -3,7 +3,7 @@ pipeline {
   stages {
     stage('Checkout Code') {
       steps {
-        git 'https://github.com/Mrdaviid-stack/adocore'
+        git(url: 'https://github.com/Mrdaviid-stack/adocore', branch: 'main')
       }
     }
 
